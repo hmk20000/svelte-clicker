@@ -108,12 +108,17 @@
                     <div class="shop-item mercenary">
                         <h3>{merc.name}</h3>
                         <p>{merc.description}</p>
-                        <p>전투력: {merc.power}</p>
+                        <p>전투력: {merc.basePower}</p>
                         <p class="cost">고용 비용: {merc.hireCost} 골드</p>
                         <p class="battle-cost">전투 비용: {merc.battleCost} 골드/전투</p>
+                        {#if merc.requiredLevel > $gameStore.character.level}
+                            <p class="warning">필요 레벨: {merc.requiredLevel}</p>
+                        {/if}
                         <button 
                             on:click={() => hireMercenary(merc)}
-                            disabled={$gameStore.resources.gold < merc.hireCost}
+                            disabled={$gameStore.resources.gold < merc.hireCost || 
+                                     merc.requiredLevel > $gameStore.character.level ||
+                                     $gameStore.mercenaries.length >= getLodgingCapacity($gameStore.buildings.lodging)}
                         >
                             고용하기
                         </button>

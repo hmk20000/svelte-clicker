@@ -39,13 +39,60 @@ const initialState = {
   mercenaryAssignments: {}  // { monsterId: [mercenaryId1, mercenaryId2, ...] }
 };
 
+// 캐릭터 레벨업 시 공격력 증가 비율 (10%)
+const CHARACTER_POWER_INCREASE_RATE = 0.1;
+
+// 전역 타이머 저장소 추가
+let autoHuntingTimers = {};
+
+// 자동 전투 시작 함수 추가
+function startAutoHunting(monsterId, merc) {
+    const timerId = `${monsterId}_${merc.uniqueId}`;
+    if (autoHuntingTimers[timerId]) {
+        clearInterval(autoHuntingTimers[timerId]);
+    }
+    
+    autoHuntingTimers[timerId] = setInterval(() => {
+        const monster = MONSTERS[monsterId];
+        gameStore.processMercenaryBattle(merc, monster);
+    }, 5000);
+}
+
+// 자동 전투 중지 함수 추가
+function stopAutoHunting(timerId) {
+    if (autoHuntingTimers[timerId]) {
+        clearInterval(autoHuntingTimers[timerId]);
+        delete autoHuntingTimers[timerId];
+    }
+}
+
+// 게임 로드 시 자동 전투 재시작
+function restartAutoHunting(state) {
+    // 기존 타이머 모두 정리
+    Object.values(autoHuntingTimers).forEach(timer => clearInterval(timer));
+    autoHuntingTimers = {};
+
+    // 배치된 용병들의 자동 전투 재시작
+    Object.entries(state.mercenaryAssignments).forEach(([monsterId, mercIds]) => {
+        mercIds.forEach(mercId => {
+            const merc = state.mercenaries.find(m => m.uniqueId === mercId);
+            if (merc) {
+                startAutoHunting(monsterId, merc);
+            }
+        });
+    });
+}
+
 // 스토어 생성
 function createGameStore() {
   const { subscribe, set, update } = writable(initialState);
 
   return {
     subscribe,
-    set,
+    set: (state) => {
+      set(state);
+      restartAutoHunting(state);  // 상태 설정 시 자동 전투 재시작
+    },
     update,
     
     addResource: (resourceType, amount) => update(state => {
@@ -78,9 +125,10 @@ function createGameStore() {
       const savedState = loadGame();
       if (savedState) {
         set({
-          ...initialState,  // 기본 상태로 시작
-          ...savedState     // 저장된 데이터로 덮어쓰기
+          ...initialState,
+          ...savedState
         });
+        restartAutoHunting(savedState);  // 게임 로드 시 자동 전투 재시작
       }
     },
 
@@ -274,27 +322,40 @@ function createGameStore() {
         newState.mercenaries[mercIndex] = merc;
       }
 
-      // 캐릭터 경험치 획득
+      // 캐릭터 경험치 획득 및 레벨업
       newState.character.exp += monster.exp;
       if (newState.character.exp >= newState.character.maxExp) {
         newState.character.level += 1;
         newState.character.exp -= newState.character.maxExp;
         newState.character.maxExp = Math.floor(newState.character.maxExp * 1.5);
+        
+        // 레벨업 시 공격력 비율 증가
+        const powerIncrease = Math.ceil(newState.character.attackPower * CHARACTER_POWER_INCREASE_RATE);
+        newState.character.attackPower += powerIncrease;
+        
+        logStore.addLog(`캐릭터가 레벨 ${newState.character.level}이 되었습니다! (공격력 +${powerIncrease}, 총 공격력: ${newState.character.attackPower})`);
       }
       
       return newState;
     }),
 
     assignMercenary: (monsterId, mercenaryId) => update(state => {
+      const merc = state.mercenaries.find(m => m.uniqueId === mercenaryId);
       if (!state.mercenaryAssignments[monsterId]) {
         state.mercenaryAssignments[monsterId] = [];
       }
       state.mercenaryAssignments[monsterId].push(mercenaryId);
+      
+      if (merc) {
+        startAutoHunting(monsterId, merc);  // 배치 시 자동 전투 시작
+      }
+      
       return state;
     }),
 
     unassignMercenary: (monsterId, mercenaryId) => update(state => {
       if (state.mercenaryAssignments[monsterId]) {
+        stopAutoHunting(`${monsterId}_${mercenaryId}`);  // 철수 시 자동 전투 중지
         state.mercenaryAssignments[monsterId] = state.mercenaryAssignments[monsterId]
           .filter(id => id !== mercenaryId);
         if (state.mercenaryAssignments[monsterId].length === 0) {
