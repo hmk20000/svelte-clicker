@@ -1,63 +1,24 @@
 <script>
     import { gameStore, getLodgingUpgradeCost, getLodgingCapacity } from "../lib/stores/gameStore";
+    import { SHOP_ITEMS } from "../lib/config/items";
+    import { MERCENARIES } from "../lib/config/mercenaries";
 
-    // 상점 아이템 목록
-    const shopItems = [
-        {
-            id: 'sword1',
-            name: '기본 검',
-            description: '기본적인 검입니다.',
-            cost: 100,
-            type: 'weapon',
-            power: 5
-        },
-        {
-            id: 'armor1',
-            name: '가죽 갑옷',
-            description: '기본적인 방어구입니다.',
-            cost: 150,
-            type: 'armor',
-            defense: 3
-        },
-        {
-            id: 'potion1',
-            name: '체력 물약',
-            description: 'HP를 회복합니다.',
-            cost: 50,
-            type: 'consumable',
-            heal: 20
-        }
-    ];
+    // 현재 선택된 탭
+    let selectedTab = 'mercenaries';
+    
+    // 아이템 목록 생성
+    const shopItems = Object.values(SHOP_ITEMS.weapons)
+        .concat(Object.values(SHOP_ITEMS.armors))
+        .concat(Object.values(SHOP_ITEMS.consumables));
 
-    const mercenaries = [
-        {
-            id: 'merc1',
-            name: '견습 전사',
-            description: '숲 사냥터에 적합한 전사입니다.',
-            hireCost: 50,
-            battleCost: 5,
-            power: 15,
-            type: 'mercenary'
-        },
-        {
-            id: 'merc2',
-            name: '숙련된 전사',
-            description: '동굴 사냥터에 적합한 전사입니다.',
-            hireCost: 200,
-            battleCost: 15,
-            power: 40,
-            type: 'mercenary'
-        },
-        {
-            id: 'merc3',
-            name: '베테랑 기사',
-            description: '산 사냥터에 적합한 기사입니다.',
-            hireCost: 500,
-            battleCost: 35,
-            power: 80,
-            type: 'mercenary'
-        }
-    ];
+    // 숙소 업그레이드 비용 계산
+    $: lodgingCost = getLodgingUpgradeCost($gameStore.buildings.lodging);
+    $: lodgingCapacity = getLodgingCapacity($gameStore.buildings.lodging);
+    $: currentMercenaries = $gameStore.mercenaries.length;
+
+    function upgradeLodging() {
+        gameStore.upgradeLodging();
+    }
 
     // 아이템 구매 함수
     function buyItem(item) {
@@ -74,15 +35,6 @@
     function hireMercenary(merc) {
         gameStore.hireMercenary(merc);
     }
-
-    // 숙소 업그레이드 비용 계산
-    $: lodgingCost = getLodgingUpgradeCost($gameStore.buildings.lodging);
-    $: lodgingCapacity = getLodgingCapacity($gameStore.buildings.lodging);
-    $: currentMercenaries = $gameStore.mercenaries.length;
-
-    function upgradeLodging() {
-        gameStore.upgradeLodging();
-    }
 </script>
 
 <div class="shop">
@@ -94,58 +46,97 @@
         </div>
     </div>
     
-    <h2>건물</h2>
-    <div class="shop-items">
-        <div class="shop-item building">
-            <h3>숙소</h3>
-            <p>용병들을 수용할 수 있는 공간입니다.</p>
-            <div class="building-info">
-                <p>현재 레벨: {$gameStore.buildings.lodging}</p>
-                <p>수용 가능: {lodgingCapacity}명</p>
-                <p>현재 고용: {currentMercenaries}명</p>
-            </div>
-            <div class="cost-info">
-                <p class="cost">업그레이드 비용:</p>
-                <ul>
-                    <li class={$gameStore.resources.gold < lodgingCost.gold ? 'insufficient' : ''}>
-                        골드: {lodgingCost.gold} / {$gameStore.resources.gold}
-                    </li>
-                    <li class={$gameStore.resources.wood < lodgingCost.wood ? 'insufficient' : ''}>
-                        목재: {lodgingCost.wood} / {$gameStore.resources.wood}
-                    </li>
-                    <li class={$gameStore.resources.stone < lodgingCost.stone ? 'insufficient' : ''}>
-                        돌: {lodgingCost.stone} / {$gameStore.resources.stone}
-                    </li>
-                </ul>
-            </div>
-            <button 
-                on:click={upgradeLodging}
-                disabled={$gameStore.resources.gold < lodgingCost.gold || 
-                         $gameStore.resources.wood < lodgingCost.wood ||
-                         $gameStore.resources.stone < lodgingCost.stone}
-            >
-                업그레이드
-            </button>
-        </div>
+    <div class="shop-tabs">
+        <button 
+            class="tab-button {selectedTab === 'mercenaries' ? 'active' : ''}"
+            on:click={() => selectedTab = 'mercenaries'}
+        >
+            용병 고용
+        </button>
+        <button 
+            class="tab-button {selectedTab === 'buildings' ? 'active' : ''}"
+            on:click={() => selectedTab = 'buildings'}
+        >
+            건물
+        </button>
+        <button 
+            class="tab-button {selectedTab === 'items' ? 'active' : ''}"
+            on:click={() => selectedTab = 'items'}
+        >
+            아이템
+        </button>
     </div>
 
-    <h2>용병 고용</h2>
-    <div class="shop-items">
-        {#each mercenaries as merc}
-            <div class="shop-item mercenary">
-                <h3>{merc.name}</h3>
-                <p>{merc.description}</p>
-                <p>전투력: {merc.power}</p>
-                <p class="cost">고용 비용: {merc.hireCost} 골드</p>
-                <p class="battle-cost">전투 비용: {merc.battleCost} 골드/전투</p>
-                <button 
-                    on:click={() => hireMercenary(merc)}
-                    disabled={$gameStore.resources.gold < merc.hireCost}
-                >
-                    고용하기
-                </button>
+    <div class="shop-content">
+        {#if selectedTab === 'buildings'}
+            <div class="shop-items">
+                <div class="shop-item building">
+                    <h3>숙소</h3>
+                    <p>용병들을 수용할 수 있는 공간입니다.</p>
+                    <div class="building-info">
+                        <p>현재 레벨: {$gameStore.buildings.lodging}</p>
+                        <p>수용 가능: {lodgingCapacity}명</p>
+                        <p>현재 고용: {currentMercenaries}명</p>
+                    </div>
+                    <div class="cost-info">
+                        <p class="cost">업그레이드 비용:</p>
+                        <ul>
+                            <li class={$gameStore.resources.gold < lodgingCost.gold ? 'insufficient' : ''}>
+                                골드: {lodgingCost.gold} / {$gameStore.resources.gold}
+                            </li>
+                            <li class={$gameStore.resources.wood < lodgingCost.wood ? 'insufficient' : ''}>
+                                목재: {lodgingCost.wood} / {$gameStore.resources.wood}
+                            </li>
+                            <li class={$gameStore.resources.stone < lodgingCost.stone ? 'insufficient' : ''}>
+                                돌: {lodgingCost.stone} / {$gameStore.resources.stone}
+                            </li>
+                        </ul>
+                    </div>
+                    <button 
+                        on:click={upgradeLodging}
+                        disabled={$gameStore.resources.gold < lodgingCost.gold || 
+                                 $gameStore.resources.wood < lodgingCost.wood ||
+                                 $gameStore.resources.stone < lodgingCost.stone}
+                    >
+                        업그레이드
+                    </button>
+                </div>
             </div>
-        {/each}
+        {:else if selectedTab === 'mercenaries'}
+            <div class="shop-items">
+                {#each MERCENARIES as merc}
+                    <div class="shop-item mercenary">
+                        <h3>{merc.name}</h3>
+                        <p>{merc.description}</p>
+                        <p>전투력: {merc.power}</p>
+                        <p class="cost">고용 비용: {merc.hireCost} 골드</p>
+                        <p class="battle-cost">전투 비용: {merc.battleCost} 골드/전투</p>
+                        <button 
+                            on:click={() => hireMercenary(merc)}
+                            disabled={$gameStore.resources.gold < merc.hireCost}
+                        >
+                            고용하기
+                        </button>
+                    </div>
+                {/each}
+            </div>
+        {:else if selectedTab === 'items'}
+            <div class="shop-items">
+                {#each shopItems as item}
+                    <div class="shop-item">
+                        <h3>{item.name}</h3>
+                        <p>{item.description}</p>
+                        <p class="cost">가격: {item.cost} 골드</p>
+                        <button 
+                            on:click={() => buyItem(item)}
+                            disabled={$gameStore.resources.gold < item.cost}
+                        >
+                            구매하기
+                        </button>
+                    </div>
+                {/each}
+            </div>
+        {/if}
     </div>
 </div>
 
@@ -262,5 +253,40 @@
 
     .cost-info li.insufficient {
         color: #dc3545;
+    }
+
+    .shop-tabs {
+        display: flex;
+        gap: 1rem;
+        margin: 1rem 0;
+        border-bottom: 2px solid #dee2e6;
+        padding-bottom: 0.5rem;
+    }
+
+    .tab-button {
+        padding: 0.75rem 1.5rem;
+        border: none;
+        border-radius: 8px 8px 0 0;
+        background: #f8f9fa;
+        cursor: pointer;
+        font-size: 1rem;
+        color: #666;
+        transition: all 0.2s;
+    }
+
+    .tab-button:hover {
+        background: #e9ecef;
+    }
+
+    .tab-button.active {
+        background: #4CAF50;
+        color: white;
+    }
+
+    .shop-content {
+        background: white;
+        border-radius: 8px;
+        padding: 1rem;
+        min-height: 400px;
     }
 </style> 

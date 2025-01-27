@@ -19,6 +19,20 @@ export const HUNTING_GROUNDS = {
     description: "고급 사냥터",
     requiredLevel: 10,
     monsters: ["bear", "golem", "dragon"]
+  },
+  desert: {
+    id: 'desert',
+    name: "사막",
+    description: "고급 사냥터",
+    requiredLevel: 15,
+    monsters: ["scorpion", "mummy", "sphinx"]
+  },
+  volcano: {
+    id: 'volcano',
+    name: "화산",
+    description: "최상급 사냥터",
+    requiredLevel: 20,
+    monsters: ["fireSpirit", "lavaGolem", "phoenix"]
   }
 };
 
@@ -112,5 +126,67 @@ export const MONSTERS = {
       stone: 20
     },
     exp: 150
+  },
+
+  // 사막 몬스터
+  scorpion: {
+    name: "전갈",
+    hp: 800,
+    rewards: {
+      gold: 150,
+      stone: 10,
+      crystal: 1
+    },
+    exp: 80
+  },
+  mummy: {
+    name: "미이라",
+    hp: 1000,
+    rewards: {
+      gold: 200,
+      crystal: 2
+    },
+    exp: 100
+  },
+  sphinx: {
+    name: "스핑크스",
+    hp: 1500,
+    rewards: {
+      gold: 300,
+      crystal: 5
+    },
+    exp: 150
+  },
+
+  // 화산 몬스터
+  fireSpirit: {
+    name: "화염정령",
+    hp: 2000,
+    rewards: {
+      gold: 400,
+      crystal: 3,
+      obsidian: 1
+    },
+    exp: 200
+  },
+  lavaGolem: {
+    name: "용암 골렘",
+    hp: 3000,
+    rewards: {
+      gold: 600,
+      obsidian: 3
+    },
+    exp: 300
+  },
+  phoenix: {
+    name: "불사조",
+    hp: 5000,
+    rewards: {
+      gold: 1000,
+      crystal: 10,
+      obsidian: 5,
+      phoenixFeather: 1
+    },
+    exp: 500
   }
 }; 
