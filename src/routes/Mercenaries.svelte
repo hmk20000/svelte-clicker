@@ -2,6 +2,7 @@
     import { gameStore } from "../lib/stores/gameStore";
     import { MONSTERS } from '../lib/config/monsters';
     import { mercenaryAssignmentModal } from '../lib/stores/modalStore';
+    import { MERCENARIES } from '../lib/config/mercenaries';
 
 
     function dismissMercenary(mercenaryId) {
@@ -35,8 +36,10 @@
                 <div class="mercenary-card {battleStatus ? 'in-battle' : ''}">
                     <div class="merc-info">
                         <h3>{merc.name} #{merc.uniqueId.split('_')[1].substr(-4)}</h3>
+                        <p>레벨: {merc.level}</p>
                         <p>전투력: {merc.power}</p>
                         <p class="battle-cost">전투 비용: {merc.battleCost} 골드</p>
+                        
                         {#if battleStatus}
                             <div class="battle-status" 
                                  on:click={() => mercenaryAssignmentModal.openAssignmentModal(battleStatus.monsterId)}
@@ -45,6 +48,21 @@
                             >
                                 🗡️ {battleStatus.monsterName} 사냥 중
                             </div>
+                        {:else}
+                            {@const mercConfig = MERCENARIES.find(m => m.id === merc.id.split('_')[0])}
+                            {#if merc.level < mercConfig.maxLevel}
+                                <div class="exp-info">
+                                    <div class="exp-bar">
+                                        <div 
+                                            class="exp-fill" 
+                                            style="width: {((merc.exp || 0) / mercConfig.expForLevel(merc.level)) * 100}%"
+                                        ></div>
+                                    </div>
+                                    <p class="exp-text">경험치: {merc.exp || 0} / {mercConfig.expForLevel(merc.level)}</p>
+                                </div>
+                            {:else}
+                                <p class="max-level">최대 레벨</p>
+                            {/if}
                         {/if}
                     </div>
                     <button 
@@ -136,5 +154,37 @@
 
     p {
         margin: 0.25rem 0;
+    }
+
+    .exp-info {
+        margin-top: 0.5rem;
+    }
+
+    .exp-bar {
+        width: 100%;
+        height: 8px;
+        background: #eee;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+
+    .exp-fill {
+        height: 100%;
+        background: #4CAF50;
+        transition: width 0.3s ease;
+    }
+
+    .exp-text {
+        font-size: 0.9em;
+        color: #666;
+        text-align: center;
+        margin-top: 0.25rem;
+    }
+
+    .max-level {
+        color: #4CAF50;
+        font-weight: bold;
+        text-align: center;
+        margin-top: 0.5rem;
     }
 </style> 

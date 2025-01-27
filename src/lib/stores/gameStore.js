@@ -3,6 +3,7 @@ import { loadGame, saveGame } from '../storage';
 import { MONSTERS } from '../config/monsters';
 import { toastStore } from './toastStore';
 import { logStore } from './logStore';
+import { MERCENARIES } from '../config/mercenaries';
 
 // 초기 상태
 const initialState = {
@@ -44,6 +45,9 @@ function createGameStore() {
 
   return {
     subscribe,
+    set,
+    update,
+    
     addResource: (resourceType, amount) => update(state => {
       const bonus = getResourceBonus(state.upgrades, resourceType);
       const finalAmount = amount * bonus;
@@ -71,11 +75,11 @@ function createGameStore() {
     }),
 
     loadSavedGame: () => {
-      const savedGame = loadGame();
-      if (savedGame) {
+      const savedState = loadGame();
+      if (savedState) {
         set({
-          ...initialState,  // 기본값으로 시작
-          ...savedGame      // 저장된 데이터로 덮어쓰기
+          ...initialState,  // 기본 상태로 시작
+          ...savedState     // 저장된 데이터로 덮어쓰기
         });
       }
     },
@@ -83,7 +87,7 @@ function createGameStore() {
     saveGame: () => {
       let currentState;
       subscribe(state => {
-        currentState = { ...state };  // 상태 복사
+        currentState = JSON.parse(JSON.stringify(state)); // 깊은 복사
       })();
       
       if (currentState) {
@@ -167,28 +171,36 @@ function createGameStore() {
     hireMercenary: (mercenary) => update(state => {
       const capacity = getLodgingCapacity(state.buildings.lodging);
       
+      // 숙소 용량 체크
       if (state.mercenaries.length >= capacity) {
         toastStore.show('더 이상 용병을 수용할 수 없습니다. 숙소를 업그레이드하세요!', 'error');
-        return state;
+        return state;  // 상태 변경 없이 반환
       }
 
+      // 골드 체크
       if (state.resources.gold < mercenary.hireCost) {
         toastStore.show('골드가 부족합니다!', 'error');
-        return state;
+        return state;  // 상태 변경 없이 반환
       }
 
-      // 고유 ID 생성 (timestamp + random string)
-      const uniqueId = `${mercenary.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const uniqueId = `${mercenary.id}_${Date.now()}`;
+      const newMercenary = {
+        ...mercenary,
+        uniqueId,
+        level: 1,
+        exp: 0,
+        power: mercenary.basePower
+      };
 
-      state.resources.gold -= mercenary.hireCost;
-      state.mercenaries.push({ 
-        ...mercenary, 
-        uniqueId,  // 고유 ID 추가
-        hired: true 
-      });
-      
-      toastStore.show(`${mercenary.name}을(를) 고용했습니다!`, 'success');
-      return state;
+      // 상태 복사 후 수정
+      return {
+        ...state,
+        resources: {
+          ...state.resources,
+          gold: state.resources.gold - mercenary.hireCost
+        },
+        mercenaries: [...state.mercenaries, newMercenary]
+      };
     }),
 
     dismissMercenary: (mercenaryId) => update(state => {
@@ -202,30 +214,58 @@ function createGameStore() {
       const requiredPower = Math.ceil(monster.hp * 0.1);
       if (mercenary.power < requiredPower) {
         logStore.addLog(`${mercenary.name}이(가) ${monster.name} 사냥에 실패했습니다! (필요 전투력: ${requiredPower})`);
-        // 전투 비용은 지불
-        state.resources.gold -= mercenary.battleCost;
-        return state;
+        return {
+          ...state,
+          resources: {
+            ...state.resources,
+            gold: state.resources.gold - mercenary.battleCost
+          }
+        };
       }
 
-      // 먼저 보상 획득
+      // 상태 복사
+      const newState = { ...state };
+      
+      // 보상 획득
       Object.entries(monster.rewards).forEach(([resource, amount]) => {
-        state.resources[resource] += amount;
+        newState.resources[resource] = (newState.resources[resource] || 0) + amount;
       });
-      
-      // 경험치 획득
-      state.character.exp += monster.exp;
-      
-      // 레벨업 체크
-      if (state.character.exp >= state.character.maxExp) {
-        state.character.level += 1;
-        state.character.exp -= state.character.maxExp;
-        state.character.maxExp = Math.floor(state.character.maxExp * 1.5);
+
+      // 용병 경험치 획득 및 레벨업 처리
+      const mercIndex = newState.mercenaries.findIndex(m => m.uniqueId === mercenary.uniqueId);
+      if (mercIndex !== -1) {
+        const merc = { ...newState.mercenaries[mercIndex] };
+        const mercConfig = MERCENARIES.find(m => m.id === merc.id.split('_')[0]);
+        
+        if (merc.level < mercConfig.maxLevel) {
+          merc.exp = (merc.exp || 0) + monster.exp;
+          const requiredExp = mercConfig.expForLevel(merc.level);
+          
+          // 레벨업 체크
+          if (merc.exp >= requiredExp) {
+            merc.level += 1;
+            merc.exp -= requiredExp;
+            merc.power = mercConfig.basePower + (mercConfig.powerPerLevel * merc.level);
+            
+            logStore.addLog(`${merc.name}이(가) 레벨 ${merc.level}이 되었습니다! (전투력: ${merc.power})`);
+          }
+        }
+        
+        newState.mercenaries[mercIndex] = merc;
       }
 
-      // 마지막으로 전투 비용 지불
-      state.resources.gold -= mercenary.battleCost;
+      // 캐릭터 경험치 획득
+      newState.character.exp += monster.exp;
+      if (newState.character.exp >= newState.character.maxExp) {
+        newState.character.level += 1;
+        newState.character.exp -= newState.character.maxExp;
+        newState.character.maxExp = Math.floor(newState.character.maxExp * 1.5);
+      }
+
+      // 전투 비용 차감
+      newState.resources.gold = Math.max(0, newState.resources.gold - mercenary.battleCost);
       
-      return state;
+      return newState;
     }),
 
     assignMercenary: (monsterId, mercenaryId) => update(state => {
@@ -266,8 +306,38 @@ function createGameStore() {
       return state;
     }),
 
+    upgradeMercenary: (mercenaryId) => update(state => {
+      const mercIndex = state.mercenaries.findIndex(m => m.uniqueId === mercenaryId);
+      if (mercIndex === -1) return state;
+
+      const merc = state.mercenaries[mercIndex];
+      const mercConfig = MERCENARIES.find(m => m.id === merc.id.split('_')[0]);
+      
+      if (!mercConfig || merc.level >= mercConfig.maxLevel) return state;
+
+      const upgradeCost = mercConfig.upgradeCosts(merc.level);
+      
+      if (state.character.exp < upgradeCost.exp) {
+        return state;
+      }
+
+      // 비용 지불
+      state.character.exp -= upgradeCost.exp;
+
+      // 용병 레벨업
+      const updatedMerc = {
+        ...merc,
+        level: merc.level + 1,
+        power: mercConfig.basePower + (mercConfig.powerPerLevel * (merc.level + 1))
+      };
+
+      state.mercenaries[mercIndex] = updatedMerc;
+      
+      return state;
+    }),
+
     resetGame: () => {
-      set(initialState);
+      set({...initialState}); // 초기 상태의 복사본으로 리셋
     }
   };
 }

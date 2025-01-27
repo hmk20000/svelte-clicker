@@ -1,3 +1,5 @@
+import { MERCENARIES } from './config/mercenaries';
+
 const GAME_SAVE_KEY = 'idle_game_save';
 
 export function saveGame(gameState) {
@@ -16,12 +18,24 @@ export function loadGame() {
         
         const gameState = JSON.parse(saveData);
         
-        // 레벨에 따른 공격력 재계산
-        let totalPower = 10; // 기본 공격력
-        for (let level = 1; level < gameState.character.level; level++) {
-            totalPower += Math.floor(5 * Math.pow(1.1, level));
-        }
+        // 용병 데이터 구조 마이그레이션
+        const mercenaries = gameState.mercenaries?.map(merc => {
+            const mercConfig = MERCENARIES.find(m => m.id === merc.id.split('_')[0]);
+            if (!mercConfig) return merc;
 
+            return {
+                ...merc,
+                basePower: mercConfig.basePower,
+                powerPerLevel: mercConfig.powerPerLevel,
+                maxLevel: mercConfig.maxLevel,
+                level: merc.level || 1,
+                exp: merc.exp || 0,
+                // 전투력 재계산
+                power: mercConfig.basePower + (mercConfig.powerPerLevel * (merc.level || 1))
+            };
+        }) || [];
+
+        // 기본 게임 상태 반환
         return {
             resources: gameState.resources || { gold: 0, wood: 0, stone: 0 },
             buildings: gameState.buildings || { lodging: 1 },
@@ -36,14 +50,17 @@ export function loadGame() {
             },
             character: {
                 ...gameState.character,
-                attackPower: totalPower  // 계산된 공격력으로 덮어쓰기
+                level: gameState.character?.level || 1,
+                exp: gameState.character?.exp || 0,
+                maxExp: gameState.character?.maxExp || 50,
+                attackPower: gameState.character?.attackPower || 5
             },
             currentBattle: gameState.currentBattle || {
                 selectedGround: null,
                 selectedMonster: null,
                 monsterHp: 0
             },
-            mercenaries: gameState.mercenaries || [],
+            mercenaries: mercenaries,
             mercenaryAssignments: gameState.mercenaryAssignments || {}
         };
     } catch (error) {

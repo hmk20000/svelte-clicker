@@ -6,12 +6,14 @@
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",
-    "preview": "vite preview --host"
+    "preview": "vite preview --host",
+    "test": "vitest"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^3.0.0",
     "svelte": "^4.2.7",
-    "vite": "^5.0.0"
+    "vite": "^5.0.0",
+    "vitest": "^3.0.4"
   },
   "dependencies": {
     "svelte-routing": "^2.13.0"
