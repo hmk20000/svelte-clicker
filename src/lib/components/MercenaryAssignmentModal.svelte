@@ -47,19 +47,12 @@
         
         huntingTimers[timerId] = setInterval(() => {
             const monster = MONSTERS[monsterId];
-            const { gold } = $gameStore.resources;
             
-            // 전투 비용을 제외한 순수익 계산
-            const netGold = monster.rewards.gold - merc.battleCost;
-            
-            // 현재 골드가 전투 비용보다 적으면 철수
-            if (gold < merc.battleCost) {
-                logStore.addLog(`${merc.name}의 비용을 지불할 수 없어 철수했습니다.`);
-                unassignMercenary(monsterId, merc.uniqueId);
-                return;
-            }
-            
+            // 전투 처리
             gameStore.processMercenaryBattle(merc, monster);
+            
+            // 순수익 계산 및 로그 표시
+            const netGold = monster.rewards.gold - merc.battleCost;
             logStore.addLog(`${merc.name}이(가) ${monster.name}을(를) 처치! 순수익: ${netGold} 골드`);
         }, 5000);
     }
@@ -93,6 +86,22 @@
     // onDestroy(() => {
     //     Object.values(huntingTimers).forEach(timer => clearInterval(timer));
     // });
+
+    function processBattles() {
+        const assignments = $gameStore.mercenaryAssignments;
+        const gold = $gameStore.resources.gold;
+
+        Object.entries(assignments).forEach(([monsterId, mercenaryIds]) => {
+            const monster = MONSTERS[monsterId];
+            mercenaryIds.forEach(mercId => {
+                const merc = $gameStore.mercenaries.find(m => m.uniqueId === mercId);
+                if (!merc) return;
+
+                // 전투 처리
+                gameStore.processMercenaryBattle(merc, monster);
+            });
+        });
+    }
 </script>
 
 {#if $mercenaryAssignmentModal.isOpen}

@@ -8,7 +8,7 @@ import { MERCENARIES } from '../config/mercenaries';
 // 초기 상태
 const initialState = {
   resources: {
-    gold: 100,  // 시작 골드 증가
+    gold: 200,  // 100 -> 200으로 증가
     wood: 0,
     stone: 0
   },
@@ -226,10 +226,30 @@ function createGameStore() {
       // 상태 복사
       const newState = { ...state };
       
-      // 보상 획득
+      // 1. 먼저 보상 획득
       Object.entries(monster.rewards).forEach(([resource, amount]) => {
         newState.resources[resource] = (newState.resources[resource] || 0) + amount;
       });
+
+      // 2. 그 다음 전투 비용 차감
+      newState.resources.gold = Math.max(0, newState.resources.gold - mercenary.battleCost);
+
+      // 3. 골드가 0이 되면 용병 해고 및 배치 해제
+      if (newState.resources.gold === 0) {
+        logStore.addLog(`${mercenary.name}이(가) 비용을 지불할 수 없어 해고되었습니다.`);
+        newState.mercenaries = newState.mercenaries.filter(m => m.uniqueId !== mercenary.uniqueId);
+        
+        // 모든 배치에서 해당 용병 제거
+        Object.keys(newState.mercenaryAssignments).forEach(monsterId => {
+          newState.mercenaryAssignments[monsterId] = newState.mercenaryAssignments[monsterId]
+            .filter(id => id !== mercenary.uniqueId);
+          if (newState.mercenaryAssignments[monsterId].length === 0) {
+            delete newState.mercenaryAssignments[monsterId];
+          }
+        });
+        
+        return newState;
+      }
 
       // 용병 경험치 획득 및 레벨업 처리
       const mercIndex = newState.mercenaries.findIndex(m => m.uniqueId === mercenary.uniqueId);
@@ -261,9 +281,6 @@ function createGameStore() {
         newState.character.exp -= newState.character.maxExp;
         newState.character.maxExp = Math.floor(newState.character.maxExp * 1.5);
       }
-
-      // 전투 비용 차감
-      newState.resources.gold = Math.max(0, newState.resources.gold - mercenary.battleCost);
       
       return newState;
     }),
