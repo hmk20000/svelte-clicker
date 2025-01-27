@@ -1,24 +1,34 @@
 <script>
-  import GameLog from './GameLog.svelte';
+  import LogViewer from './LogViewer.svelte';
 </script>
 
 <div class="game-layout">
-  <div class="main-content">
+  <div class="content">
     <slot />
   </div>
-  <GameLog />
+
+  <div class="log-container">
+    <LogViewer />
+  </div>
 </div>
 
 <style>
   .game-layout {
-    display: flex;
-    gap: 20px;
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 20px;
+    padding: 1rem;
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    gap: 1rem;
+    height: calc(100vh - 2rem);
   }
 
-  .main-content {
-    flex: 2;
+  .content {
+    overflow-y: auto;
+  }
+
+  .log-container {
+    border-left: 1px solid #dee2e6;
+    padding-left: 1rem;
+    height: 100%;
+    overflow-y: hidden;
   }
 </style> 

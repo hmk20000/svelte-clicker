@@ -3,7 +3,12 @@
     import { MONSTERS } from '../lib/config/monsters';
     import { mercenaryAssignmentModal } from '../lib/stores/modalStore';
     import { MERCENARIES } from '../lib/config/mercenaries';
+    import { toastStore } from '../lib/stores/toastStore';
+    import GameLayout from '../lib/components/GameLayout.svelte';
 
+    // $gameStore를 사용하면 자동으로 구독되어 상태 변경 시 컴포넌트가 갱신됨
+    $: mercenaries = $gameStore.mercenaries;
+    $: assignments = $gameStore.mercenaryAssignments;
 
     function dismissMercenary(mercenaryId) {
         gameStore.dismissMercenary(mercenaryId);
@@ -11,35 +16,62 @@
 
     // 용병이 전투중인지 확인하는 함수
     function getMercenaryBattleStatus(mercId) {
-        const assignments = $gameStore.mercenaryAssignments;
         for (const [monsterId, mercIds] of Object.entries(assignments)) {
             if (mercIds.includes(mercId)) {
                 return {
                     monsterName: MONSTERS[monsterId].name,
-                    monsterId: monsterId  // monsterId도 함께 반환
+                    monsterId: monsterId
                 };
             }
         }
         return null;
     }
+
+    function getAssignedMonster(mercId) {
+        for (const [monsterId, mercIds] of Object.entries(assignments)) {
+            if (mercIds.includes(mercId)) {
+                return monsterId;
+            }
+        }
+        return null;
+    }
+
+    function getExpProgress(merc) {
+        const mercConfig = MERCENARIES.find(m => m.id === merc.id.split('_')[0]);
+        if (!mercConfig) return 0;
+        const requiredExp = mercConfig.expForLevel(merc.level);
+        return (merc.exp / requiredExp * 100).toFixed(1);
+    }
 </script>
 
-<div class="mercenaries">
+<GameLayout>
     <h1>용병 관리</h1>
     
-    {#if $gameStore.mercenaries.length === 0}
+    {#if mercenaries.length === 0}
         <p>고용된 용병이 없습니다.</p>
     {:else}
         <div class="mercenary-list">
-            {#each $gameStore.mercenaries as merc}
+            {#each mercenaries as merc}
                 {@const battleStatus = getMercenaryBattleStatus(merc.uniqueId)}
+                {@const mercConfig = MERCENARIES.find(m => m.id === merc.id.split('_')[0])}
+                {@const assignedMonster = getAssignedMonster(merc.uniqueId)}
                 <div class="mercenary-card {battleStatus ? 'in-battle' : ''}">
                     <div class="merc-info">
                         <h3>{merc.name} #{merc.uniqueId.split('_')[1].substr(-4)}</h3>
-                        <p>레벨: {merc.level}</p>
+                        <p>레벨: {merc.level} / {mercConfig.maxLevel}</p>
                         <p>전투력: {merc.power}</p>
                         <p class="battle-cost">전투 비용: {merc.battleCost} 골드</p>
                         
+                        <div class="exp-info">
+                            <div class="exp-bar">
+                                <div 
+                                    class="exp-fill" 
+                                    style="width: {getExpProgress(merc)}%"
+                                ></div>
+                            </div>
+                            <p class="exp-text">경험치: {merc.exp} / {mercConfig.expForLevel(merc.level)} EXP ({getExpProgress(merc)}%)</p>
+                        </div>
+
                         {#if battleStatus}
                             <div class="battle-status" 
                                  on:click={() => mercenaryAssignmentModal.openAssignmentModal(battleStatus.monsterId)}
@@ -48,21 +80,6 @@
                             >
                                 🗡️ {battleStatus.monsterName} 사냥 중
                             </div>
-                        {:else}
-                            {@const mercConfig = MERCENARIES.find(m => m.id === merc.id.split('_')[0])}
-                            {#if merc.level < mercConfig.maxLevel}
-                                <div class="exp-info">
-                                    <div class="exp-bar">
-                                        <div 
-                                            class="exp-fill" 
-                                            style="width: {((merc.exp || 0) / mercConfig.expForLevel(merc.level)) * 100}%"
-                                        ></div>
-                                    </div>
-                                    <p class="exp-text">경험치: {merc.exp || 0} / {mercConfig.expForLevel(merc.level)}</p>
-                                </div>
-                            {:else}
-                                <p class="max-level">최대 레벨</p>
-                            {/if}
                         {/if}
                     </div>
                     <button 
@@ -77,13 +94,9 @@
             {/each}
         </div>
     {/if}
-</div>
+</GameLayout>
 
 <style>
-    .mercenaries {
-        padding: 1rem;
-    }
-
     .mercenary-list {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
@@ -115,7 +128,6 @@
     }
 
     .battle-status {
-        margin-top: 0.5rem;
         color: #4CAF50;
         font-weight: bold;
         display: flex;
@@ -123,6 +135,7 @@
         gap: 0.5rem;
         cursor: pointer;
         user-select: none;
+        margin-top: 0.5rem;
     }
 
     .battle-status:hover {
